@@ -1,0 +1,40 @@
+# ===== 环境与模型（体积大，不入库）=====
+.venv/
+venv/
+models/
+bin/
+
+# ===== 本机私有配置（含个人目录路径、凭据）=====
+local_config.py
+
+# ===== 临时与中间产物（目录约定见 config.py）=====
+# temp/ 下有 cache（音频/分段 JSON/下载缓存）、logs、scratch、pycache，全部可重建
+temp/
+
+# ===== 转写产出 =====
+# output/ 里是具体素材的转写稿，含视频内容，不适合随代码公开
+output/
+
+# ===== WorkBuddy 工作记录（个人笔记）=====
+.workbuddy/
+
+# ===== 日志 =====
+*.log
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ===== 编辑器 / 操作系统 =====
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini

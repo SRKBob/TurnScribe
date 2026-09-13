@@ -1,0 +1,16 @@
+# 核心推理。funasr 必须 >= 1.4.15：更早的版本时间戳格式与当前 model.py 不兼容。
+# torch / torchaudio 不在此安装：必须指定 CUDA 版本，见 install.bat。
+# Windows 上 PyPI 的 torch 是 CPU-only 版本，装错会导致没有 GPU 加速。
+
+funasr>=1.4.15
+modelscope>=1.16
+
+# GUI
+gradio>=5.0
+
+# 链接下载
+yt-dlp>=2025.1.1
+
+# 说话人分离的聚类与音频读取
+scipy>=1.11
+soundfile>=0.12

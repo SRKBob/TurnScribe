@@ -1,0 +1,22 @@
+# 换行符规范：避免跨平台协作时 Windows 批处理被写成 LF 而失效
+#
+# 背景：cmd 解析 LF-only 的 .bat 会丢字符（实测 `echo` 被读成 `ope`），
+# 所以 .bat/.cmd 必须锁定 CRLF。
+
+* text=auto eol=lf
+
+# Windows 批处理强制 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制文件不做文本转换
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.wav  binary
+*.mp3  binary
+*.mp4  binary
+*.onnx binary
+*.pt   binary
