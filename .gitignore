@@ -7,6 +7,9 @@ bin/
 # ===== 本机私有配置（含个人目录路径、凭据）=====
 local_config.py
 
+# ===== 界面主题偏好（用户上次选的主题，运行时写入）=====
+.ui_theme.json
+
 # ===== 临时与中间产物（目录约定见 config.py）=====
 # temp/ 下有 cache（音频/分段 JSON/下载缓存）、logs、scratch、pycache，全部可重建
 temp/

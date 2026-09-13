@@ -26,9 +26,21 @@ from core.downloader import detect_platform, is_url  # noqa: E402
 from core.media import ffmpeg_available  # noqa: E402
 from core.pipeline import Pipeline  # noqa: E402
 from core.render import fmt_ts  # noqa: E402
+from ui_theme import (
+    FONTS_DIR,
+    base_css,
+    gradio_theme,
+    load_theme,
+    save_theme,
+    theme_choices,
+    theme_css,
+)  # noqa: E402
 
 VIDEO_TYPES = [".mp4", ".mkv", ".mov", ".avi", ".flv", ".webm", ".ts", ".m4v", ".wmv"]
 AUDIO_TYPES = [".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg"]
+
+if FONTS_DIR.is_dir():
+    gr.set_static_paths([FONTS_DIR])  # 内置字体按 /file= 直读磁盘，不进缓存
 
 PLATFORM_NOTE = {
     "bilibili": "B站链接通常可直接解析",
@@ -182,47 +194,65 @@ def run_task(
 
 def build_ui() -> gr.Blocks:
     ensure_dirs()
-    with gr.Blocks(title="话轮 TurnScribe", theme=gr.themes.Soft()) as demo:
-        gr.Markdown(
-            "# 话轮 TurnScribe\n"
-            "把视频转成「谁在说」的文稿。"
-            "上传视频或粘贴链接，自动转写为带说话人区分的 Markdown 文档。"
-            "全程本地运行，数据不出本机。"
-        )
-        with gr.Row():
-            with gr.Column(scale=3):
-                files = gr.File(
-                    label="上传视频 / 音频（可多选）",
-                    file_count="multiple",
-                    file_types=VIDEO_TYPES + AUDIO_TYPES,
-                    type="filepath",
-                )
-                links = gr.Textbox(
-                    label="视频链接（每行一个）",
-                    placeholder="https://www.bilibili.com/video/BV...\nhttps://v.douyin.com/xxxxx/",
-                    lines=3,
-                )
-            with gr.Column(scale=2):
-                out_dir = gr.Textbox(
-                    label="输出目录（可改为任意本地路径，如 D:\\我的文稿）",
-                    value=str(OUTPUT_DIR),
-                )
-                open_btn = gr.Button("打开输出目录", size="sm")
-                device = gr.Dropdown(
-                    label="推理设备",
-                    choices=["auto", "cuda:0", "cpu"],
-                    value="auto",
-                )
-                language = gr.Dropdown(
-                    label="语言",
-                    choices=["auto", "zh", "yue", "en", "ja", "ko"],
-                    value="auto",
-                )
-                style = gr.Radio(
-                    label="Markdown 样式",
-                    choices=[("角色A：内容", "inline"), ("角色名独立成行", "block")],
-                    value="inline",
-                )
+    initial_theme = load_theme()   # 恢复上次选择的主题（重启 / 刷新不丢）
+    # 注意：Gradio 6 起 theme / css 不再由 Blocks() 生效，必须在 launch() 里传。
+    with gr.Blocks(title="话轮 TurnScribe") as demo:
+        # 换肤变量槽：内容是 <style>，主题变化时由 Python 回调整体替换（无需前端 JS）
+        theme_vars = gr.HTML(value=theme_css(initial_theme), elem_classes=["ts-theme-vars"])
+
+        with gr.Row(elem_classes=["ts-head"]):
+            gr.HTML(
+                '<div class="ts-hero">'
+                '<h1>话轮<span class="ts-en">TurnScribe</span></h1>'
+                "<p>把视频转成「谁在说」的文稿"
+                '<span class="ts-dot">·</span>上传视频或粘贴链接，自动转写为带说话人区分的 Markdown'
+                '<span class="ts-dot">·</span>全程本地运行，数据不出本机</p>'
+                "</div>"
+            )
+            # 主题选择器：调色盘图标按钮，点击弹出下拉选项
+            theme_picker = gr.Dropdown(
+                choices=theme_choices(),
+                value=initial_theme,
+                show_label=False,
+                filterable=False,
+                elem_classes=["ts-theme-dd"],
+            )
+
+        with gr.Column(elem_classes=["ts-card"]):
+            with gr.Row():
+                with gr.Column(scale=3):
+                    files = gr.File(
+                        label="上传视频 / 音频（可多选）",
+                        file_count="multiple",
+                        file_types=VIDEO_TYPES + AUDIO_TYPES,
+                        type="filepath",
+                    )
+                    links = gr.Textbox(
+                        label="视频链接（每行一个）",
+                        placeholder="https://www.bilibili.com/video/BV...\nhttps://v.douyin.com/xxxxx/",
+                        lines=3,
+                    )
+                with gr.Column(scale=2):
+                    out_dir = gr.Textbox(
+                        label="输出目录（可改为任意本地路径，如 D:\\我的文稿）",
+                        value=str(OUTPUT_DIR),
+                    )
+                    open_btn = gr.Button("打开输出目录", size="sm")
+                    device = gr.Dropdown(
+                        label="推理设备",
+                        choices=["auto", "cuda:0", "cpu"],
+                        value="auto",
+                    )
+                    language = gr.Dropdown(
+                        label="语言",
+                        choices=["auto", "zh", "yue", "en", "ja", "ko"],
+                        value="auto",
+                    )
+                    style = gr.Radio(
+                        label="Markdown 样式",
+                        choices=[("角色A：内容", "inline"), ("角色名独立成行", "block")],
+                        value="inline",
+                    )
 
         with gr.Accordion("高级参数", open=False):
             with gr.Row():
@@ -236,9 +266,9 @@ def build_ui() -> gr.Blocks:
                     resume = gr.Checkbox(label="断点续传（复用已有识别结果）", value=True)
                     keep_audio = gr.Checkbox(label="保留抽取的音频文件", value=False)
 
-        run_btn = gr.Button("开始转写", variant="primary", size="lg")
+        run_btn = gr.Button("开始转写", variant="primary", size="lg", elem_classes=["ts-run"])
 
-        status = gr.Markdown("### 就绪\n")
+        status = gr.Markdown("### 就绪\n", elem_classes=["ts-status"])
         with gr.Row():
             with gr.Column(scale=1):
                 log_box = gr.Textbox(
@@ -247,15 +277,25 @@ def build_ui() -> gr.Blocks:
                     max_lines=24,
                     autoscroll=True,
                     buttons=["copy"],  # Gradio 6 已移除 show_copy_button
+                    elem_classes=["ts-log"],
                 )
             with gr.Column(scale=2):
-                preview = gr.Markdown(label="转写结果预览")
-        download = gr.Files(label="下载 Markdown")
+                preview = gr.Markdown(
+                    label="转写结果预览",
+                    value="_转写完成后，文稿会显示在这里。_",
+                    elem_classes=["ts-preview"],
+                )
+        download = gr.Files(label="下载 Markdown", height=88, elem_classes=["ts-download"])
 
-        gr.Markdown("#### 环境状态\n" + env_report())
-        gr.Markdown(
-            "> 转写由 SenseVoice 自动完成，可能存在识别误差；"
-            "角色编号（角色A/角色B）仅表示「不同的人」，不包含身份信息。"
+        with gr.Accordion("环境状态", open=False):
+            gr.Markdown(env_report())
+
+        gr.HTML(
+            '<div class="ts-foot">'
+            "转写由 SenseVoice 自动完成，可能存在识别误差；"
+            "角色编号（角色A / 角色B）只表示「不同的人」，不含身份信息。"
+            "<br>全部处理在本机完成 · <code>127.0.0.1:7860</code>"
+            "</div>"
         )
 
         run_btn.click(
@@ -267,6 +307,26 @@ def build_ui() -> gr.Blocks:
             outputs=[status, log_box, download, preview],
         )
         open_btn.click(fn=open_folder, inputs=[out_dir], outputs=[status])
+
+        def apply_theme(name: str) -> str:
+            """换肤 + 记住选择：重启 / 刷新后由 load_theme() 恢复。"""
+            save_theme(name or "")
+            return theme_css(name)
+
+        theme_picker.change(
+            fn=apply_theme, inputs=[theme_picker], outputs=[theme_vars]
+        )
+
+        def sync_theme_on_load():
+            """每次页面加载都以后端偏好文件为准。
+
+            picker 初值与 launch(head=) 都是服务器启动时算好的静态值——刷新只是
+            重连同一进程，若不在这里重读文件，刷新会回退到「启动那一刻」的主题。
+            """
+            t = load_theme()
+            return t, theme_css(t)
+
+        demo.load(fn=sync_theme_on_load, inputs=None, outputs=[theme_picker, theme_vars])
 
     return demo
 
@@ -283,6 +343,9 @@ def main() -> None:
         inbrowser=True,
         show_error=True,
         quiet=False,
+        theme=gradio_theme(),
+        css=base_css(),
+        head=theme_css(load_theme()),   # 首屏即用上次选择的主题，避免闪一下无色
     )
 
 

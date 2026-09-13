@@ -157,8 +157,11 @@ Linux/macOS：~/.cache/modelscope
 | 语言 | `auto` 或指定 `zh / yue / en / ja / ko`，指定后更准 |
 | Markdown 样式 | `角色A：内容`（紧凑）或 角色名独立成行（长发言更清晰） |
 | 高级参数 | 聚类阈值、时间戳开关、发言时长统计、断点续传、保留音轨 |
+| 界面主题 | 右上角调色盘图标，点开下拉选择：秋波蓝 / 竹月青 / 桂黄暖 / WorkBuddy 亮 / WorkBuddy 暗；**选择会被记住，重启后仍生效** |
 
 处理过程中日志实时刷新，右侧同步预览结果，结束后可一键下载。
+
+前三套配色取自中国传统色卡素材，后两套对齐 WorkBuddy 客户端的明暗设计语言。五套全部通过 CSS 变量实现，点调色盘图标即在下拉中切换，不重载页面，也不依赖任何网络字体或外部资源。选择保存在项目根目录的 `.ui_theme.json`（已 gitignore），删除它则恢复默认主题。每套的完整色值、组件样式与派生规则见 [`docs/THEMES.md`](docs/THEMES.md)。
 
 ### 命令行
 
@@ -221,6 +224,7 @@ ffmpeg 的查找顺序：环境变量 `FFMPEG_BIN` → `PATH` → 项目 `bin/` 
 
 ```
 ├── app.py                    Gradio 界面入口
+├── ui_theme.py               界面主题与样式（五套配色，含明暗）
 ├── config.py                 配置中心（所有可调参数）
 ├── local_config.example.py   本机私有路径模板（复制为 local_config.py 使用）
 ├── requirements.txt          Python 依赖清单
@@ -242,7 +246,10 @@ ffmpeg 的查找顺序：环境变量 `FFMPEG_BIN` → `PATH` → 项目 `bin/` 
 │   ├── check_env.py          环境自检（ffmpeg / torch / GPU / 模型）
 │   ├── selftest.py           离线自检（文本清洗、时间戳、聚类、渲染）
 │   ├── e2e_test.py           端到端测试（自造两人对话音频跑全链路）
-│   └── uicheck.py            GUI 构建冒烟测试
+│   ├── uicheck.py            GUI 构建冒烟测试
+│   ├── themecheck.py         主题对比度校验（WCAG，离线秒级）
+│   └── gen_theme_doc.py      从代码导出 docs/THEMES.md
+├── docs/                     文档（THEMES.md 界面设计规范）
 ├── output/                   转写稿（可从界面改为任意路径）
 ├── temp/                     临时产物：cache / logs / scratch，可整体删除
 └── models/                   预留的模型目录（模型实际缓存在用户目录，见上文）
@@ -258,6 +265,12 @@ rem 语法检查 + 离线自检（秒级，不需要模型和 GPU）
 
 rem GUI 能否正常构建（列出组件数量）
 .venv\Scripts\python.exe tools\uicheck.py
+
+rem 五套主题的对比度校验（WCAG，改配色后必跑）
+.venv\Scripts\python.exe tools\themecheck.py
+
+rem 改动配色后刷新设计规范文档
+.venv\Scripts\python.exe tools\gen_theme_doc.py
 
 rem 端到端：自动合成一段两人对话音频，跑完整链路
 .venv\Scripts\python.exe tools\e2e_test.py
@@ -314,4 +327,8 @@ SenseVoice 的同音字误差是固有现象（如「健身房」→「健心房
 
 ## 致谢
 
-感谢 GitHub 上的众多开源项目。本项目用到的 FunASR、SenseVoice、CAM++、Gradio、yt-dlp、FFmpeg——每一个库都让「做产品」这件事变得前所未有地简单。
+**开源社区。** 本项目站在 FunASR、SenseVoice、CAM++、Gradio、yt-dlp、FFmpeg 的肩膀上。每一个库都让「做产品」这件事变得前所未有地简单；没有这些持续维护的开源项目，这个工具根本不会存在。
+
+**DeepSeek 团队。** 从第一行代码到跑通第一段真实视频，背后是 DeepSeek 模型在持续推理、写码、查错。感谢他们把高质量的中文模型能力做到便宜、稳、可用，让个人开发者也能把一个念头真正落地成能跑的东西。
+
+**WorkBuddy 团队。** 感谢 WorkBuddy 提供了一套真正顺手的编程 Agent 环境——文件读写、命令执行、后台任务、界面预览，整条开发链路都被打磨得足够顺滑。它把「和 AI 一起写代码」从演示变成了日常。
