@@ -1,4 +1,4 @@
-"""视频语音转文字工具 · Gradio 本地界面。
+"""话轮 TurnScribe · Gradio 本地界面。
 
 启动：
     run.bat                  （推荐，双击即可）
@@ -182,9 +182,10 @@ def run_task(
 
 def build_ui() -> gr.Blocks:
     ensure_dirs()
-    with gr.Blocks(title="视频语音转文字工具", theme=gr.themes.Soft()) as demo:
+    with gr.Blocks(title="话轮 TurnScribe", theme=gr.themes.Soft()) as demo:
         gr.Markdown(
-            "# 视频语音转文字工具\n"
+            "# 话轮 TurnScribe\n"
+            "把视频转成「谁在说」的文稿。"
             "上传视频或粘贴链接，自动转写为带说话人区分的 Markdown 文档。"
             "全程本地运行，数据不出本机。"
         )

@@ -11,7 +11,7 @@ if not exist ".venv\Scripts\python.exe" (
     exit /b 1
 )
 
-echo 正在启动视频语音转文字工具...
+echo 正在启动话轮 TurnScribe...
 echo 服务地址 http://127.0.0.1:7860  （关闭本窗口即停止服务）
 echo.
 

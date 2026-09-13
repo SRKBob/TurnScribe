@@ -1,4 +1,4 @@
-"""命令行批量转写入口。与 GUI 共用同一条 pipeline。
+"""话轮 TurnScribe · 命令行批量转写入口。与 GUI 共用同一条 pipeline。
 
 用法：
     .venv\\Scripts\\python.exe tools\\run.py <本地文件或链接> [更多来源...] [-o 输出目录]
@@ -25,7 +25,7 @@ from core.pipeline import Pipeline  # noqa: E402
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="视频语音转文字 → Markdown（带说话人区分）",
+        description="话轮 TurnScribe — 视频语音转文字 → Markdown（带说话人区分）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument("sources", nargs="+", help="本地媒体路径或视频链接，可多个")
