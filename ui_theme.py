@@ -583,6 +583,14 @@ footer, .gradio-container footer {{ display: none !important; }}
   margin-left: 8px;
   font-size: 26px;
 }}
+.ts-hero h1 .ts-logo {{
+  display: inline-block !important;  /* Gradio .prose img 默认 block，会把图标挤成独立行 */
+  height: 1.24em;
+  width: auto;
+  vertical-align: -0.24em;
+  margin-right: 12px;
+  border-radius: 0.22em;
+}}
 .ts-hero p {{
   margin: 7px 0 0;
   font-size: 13.5px;

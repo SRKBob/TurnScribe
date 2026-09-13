@@ -42,6 +42,11 @@ AUDIO_TYPES = [".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg"]
 
 if FONTS_DIR.is_dir():
     gr.set_static_paths([FONTS_DIR])  # 内置字体按 /file= 直读磁盘，不进缓存
+ASSETS_DIR = ROOT / "assets"
+ICON_PNG = ASSETS_DIR / "icon.png"
+ICON_URL = f"/gradio_api/file={ASSETS_DIR.as_posix()}/icon.png"
+if ASSETS_DIR.is_dir():
+    gr.set_static_paths([ASSETS_DIR])  # 产品图标（页头 / 标签页 favicon）
 
 PLATFORM_NOTE = {
     "bilibili": "B站链接通常可直接解析",
@@ -241,8 +246,13 @@ def build_ui() -> gr.Blocks:
         with gr.Row(elem_classes=["ts-head"]):
             gr.HTML(
                 '<div class="ts-hero">'
-                '<h1>话轮<span class="ts-en">TurnScribe</span></h1>'
-                "<p>把视频转成「谁在说」的文稿"
+                + (
+                    f'<h1><img class="ts-logo" src="{ICON_URL}" alt="">话轮'
+                    '<span class="ts-en">TurnScribe</span></h1>'
+                    if ICON_PNG.is_file()
+                    else '<h1>话轮<span class="ts-en">TurnScribe</span></h1>'
+                )
+                + "<p>把视频转成「谁在说」的文稿"
                 '<span class="ts-dot">·</span>上传视频或粘贴链接，自动转写为带说话人区分的 Markdown'
                 '<span class="ts-dot">·</span>全程本地运行，数据不出本机</p>'
                 "</div>"
@@ -372,6 +382,16 @@ def build_ui() -> gr.Blocks:
     return demo
 
 
+def head_html() -> str:
+    """launch(head=) 的统一入口：favicon + 主题变量，测试实例与 main() 共用。"""
+    favicon = (
+        f'<link rel="icon" type="image/png" href="{ICON_URL}">'
+        if ICON_PNG.is_file()
+        else ""
+    )
+    return favicon + theme_css(load_theme())
+
+
 def main() -> None:
     ok, detail = ffmpeg_available()
     if not ok:
@@ -386,7 +406,7 @@ def main() -> None:
         quiet=False,
         theme=gradio_theme(),
         css=base_css(),
-        head=theme_css(load_theme()),   # 首屏即用上次选择的主题，避免闪一下无色
+        head=head_html(),   # favicon + 首屏即用上次选择的主题，避免闪一下无色
     )
 
 
