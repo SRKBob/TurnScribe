@@ -18,6 +18,9 @@ temp/
 # output/ 里是具体素材的转写稿，含视频内容，不适合随代码公开
 output/
 
+# ===== 发行包（tools/make_dist.py 产物）=====
+dist/
+
 # ===== WorkBuddy 工作记录（个人笔记）=====
 .workbuddy/
 

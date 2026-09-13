@@ -27,3 +27,4 @@ except Exception as exc:
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 (LOG_DIR / "_ui.log").write_text("\n".join(report), encoding="utf-8")
 print("\n".join(report))
+sys.exit(0 if report[0].startswith("UI_OK") else 1)

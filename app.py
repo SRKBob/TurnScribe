@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from config import CONFIG, OUTPUT_DIR, ASRConfig, DiarizeConfig, RenderConfig, ensure_dirs  # noqa: E402
 from core.downloader import detect_platform, is_url  # noqa: E402
+from core.bootstrap import models_missing, status_markdown  # noqa: E402
 from core.errfmt import friendly_error  # noqa: E402
 from core.media import ffmpeg_available  # noqa: E402
 from core.pipeline import Pipeline  # noqa: E402
@@ -187,6 +188,9 @@ def run_task(
         return
 
     log = [f"待处理 {len(sources)} 个任务：", *[f"  · {n}" for n in notes], ""]
+    if models_missing():
+        log.append("提示：首次运行会自动联网下载模型权重（约 1GB，只下一次，中断可续传）")
+        log.append("")
     outputs: list[str] = []
     preview = ""
 
@@ -251,6 +255,9 @@ def build_ui() -> gr.Blocks:
                 filterable=False,
                 elem_classes=["ts-theme-dd"],
             )
+
+        # 首启引导卡：ffmpeg / GPU / 模型权重缺什么就明示怎么补；全就绪时收成一行
+        env_banner = gr.Markdown(status_markdown(), elem_classes=["ts-env"])
 
         with gr.Column(elem_classes=["ts-card"]):
             with gr.Row():
@@ -321,7 +328,7 @@ def build_ui() -> gr.Blocks:
                 )
         download = gr.Files(label="下载 Markdown", height=88, elem_classes=["ts-download"])
 
-        with gr.Accordion("环境状态", open=False):
+        with gr.Accordion("环境详情", open=False):
             gr.Markdown(env_report())
 
         gr.HTML(
@@ -351,16 +358,16 @@ def build_ui() -> gr.Blocks:
             fn=apply_theme, inputs=[theme_picker], outputs=[theme_vars]
         )
 
-        def sync_theme_on_load():
-            """每次页面加载都以后端偏好文件为准。
+        def sync_on_load():
+            """每次页面加载都以后端为准：主题重读偏好，环境卡重查就绪状态。
 
-            picker 初值与 launch(head=) 都是服务器启动时算好的静态值——刷新只是
-            重连同一进程，若不在这里重读文件，刷新会回退到「启动那一刻」的主题。
+            picker 初值、launch(head=)、引导卡初值都是服务器启动时的静态值——刷新只是
+            重连同一进程，若不在这里重算，刷新会回到「启动那一刻」的样子。
             """
             t = load_theme()
-            return t, theme_css(t)
+            return t, theme_css(t), status_markdown()
 
-        demo.load(fn=sync_theme_on_load, inputs=None, outputs=[theme_picker, theme_vars])
+        demo.load(fn=sync_on_load, inputs=None, outputs=[theme_picker, theme_vars, env_banner])
 
     return demo
 
