@@ -209,6 +209,7 @@ def run_task(
         log.append("")
     outputs: list[str] = []
     preview = ""
+    ok_count = 0  # 按任务计数。产出文件数不等于任务数：一个任务可同时产出 md + srt
 
     for index, source in enumerate(sources, start=1):
         header = f"[{index}/{len(sources)}] {Path(source).name if not is_url(source) else source}"
@@ -220,6 +221,7 @@ def run_task(
 
         try:
             result = pipeline.process(source, out_dir=target_dir, progress=progress)
+            ok_count += 1
             if result.md_path:
                 outputs.append(str(result.md_path))
             if result.srt_path:
@@ -243,7 +245,7 @@ def run_task(
         log.append("")
         yield f"### ⏳ 已处理 {index}/{len(sources)}\n", "\n".join(log), outputs, preview
 
-    done = len(outputs)
+    done = ok_count
     failed = len(sources) - done
     if failed and not done:
         status = f"### ❌ 全部 {failed} 个任务失败\n\n👉 每个任务的失败原因和处理建议在左侧「处理日志」里，修正后重试。\n"
