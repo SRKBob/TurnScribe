@@ -12,7 +12,6 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-import traceback
 from dataclasses import replace
 from pathlib import Path
 
@@ -23,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from config import CONFIG, OUTPUT_DIR, ASRConfig, DiarizeConfig, RenderConfig, ensure_dirs  # noqa: E402
 from core.downloader import detect_platform, is_url  # noqa: E402
+from core.errfmt import friendly_error  # noqa: E402
 from core.media import ffmpeg_available  # noqa: E402
 from core.pipeline import Pipeline  # noqa: E402
 from core.render import fmt_ts  # noqa: E402
@@ -119,6 +119,16 @@ def build_inputs(files: list[str] | None, links: str) -> tuple[list[str], list[s
     return sources, notes
 
 
+def _fail_stage(source: str) -> str:
+    """从任务来源推断失败环节，用于日志里的第一行人话描述。"""
+    if is_url(source):
+        platform = detect_platform(source)
+        return f"下载「{platform}」视频"
+    suffix = Path(source).suffix.lower()
+    kind = "音频" if suffix in AUDIO_TYPES else "视频"
+    return f"处理本地{kind} {Path(source).name}"
+
+
 def run_task(
     files: list[str] | None,
     links: str,
@@ -153,11 +163,28 @@ def run_task(
     )
     global _PIPELINE
     if _PIPELINE is None or _PIPELINE.cfg != cfg:
-        _PIPELINE = Pipeline(cfg)
+        try:
+            _PIPELINE = Pipeline(cfg)
+        except Exception as exc:  # 模型加载失败（首次需联网下载 / 显存不足等）
+            _PIPELINE = None
+            yield (
+                "### ❌ 启动转写引擎失败\n\n"
+                + friendly_error(exc, source="加载模型")
+                + "\n\n修正后点击「开始转写」重试。\n"
+            ), "", [], ""
+            return
     pipeline = _PIPELINE
 
     target_dir = Path(out_dir).expanduser() if out_dir.strip() else OUTPUT_DIR
-    target_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        yield (
+            "### ❌ 输出目录不可用\n\n"
+            + friendly_error(exc, source="创建输出目录")
+            + "\n\n把「输出目录」换成普通文件夹（如 `D:\\我的文稿`）后重试。\n"
+        ), "", [], ""
+        return
 
     log = [f"待处理 {len(sources)} 个任务：", *[f"  · {n}" for n in notes], ""]
     outputs: list[str] = []
@@ -179,14 +206,21 @@ def run_task(
             for warning in result.warnings:
                 log.append(f"  注意：{warning}")
         except Exception as exc:  # 单个任务失败不应中断整批
-            log.append(f"  失败：{exc}")
-            log.append("  " + traceback.format_exc(limit=3).replace("\n", "\n  "))
+            # 界面日志只给人话 + 建议；完整堆栈已由 friendly_error 打到控制台
+            stage = _fail_stage(source)
+            log.append(f"  ❌ 失败 — {stage}")
+            log.append("  " + friendly_error(exc, source=stage).replace("\n", "\n  "))
         log.append("")
         yield f"### ⏳ 已处理 {index}/{len(sources)}\n", "\n".join(log), outputs, preview
 
     done = len(outputs)
     failed = len(sources) - done
-    status = f"### ✅ 完成 {done} 个" + (f"，失败 {failed} 个" if failed else "")
+    if failed and not done:
+        status = f"### ❌ 全部 {failed} 个任务失败\n\n👉 每个任务的失败原因和处理建议在左侧「处理日志」里，修正后重试。\n"
+    elif failed:
+        status = f"### ✅ 完成 {done} 个，❌ 失败 {failed} 个\n\n👉 失败任务的「原因 + 怎么办」在左侧「处理日志」里。\n"
+    else:
+        status = f"### ✅ 完成 {done} 个\n"
     log.append(status)
     log.append(f"输出目录：{target_dir}")
     yield status + "\n", "\n".join(log), outputs, preview
