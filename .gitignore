@@ -54,3 +54,7 @@ desktop.ini
 
 # 面试 PPT 工作目录（个人材料，不入库）
 话轮TurnScribe项目讲解/
+
+# PPT/构建工具缓存
+.cache/
+.slidep/
