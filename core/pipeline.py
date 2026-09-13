@@ -22,6 +22,7 @@ from core.diarize import DiarizationError, Diarizer, assign_single_speaker
 from core.downloader import cleanup_downloads, resolve_input
 from core.media import extract_audio, probe_duration_ms
 from core.render import merge_segments, render_markdown, safe_filename, write_markdown
+from core.srt import render_srt, speaker_prefix_needed, write_srt
 from core.types import MediaMeta, Segment, Turn
 
 ProgressFn = Callable[[float, str], None]
@@ -42,6 +43,7 @@ class TaskResult:
     elapsed_s: float
     warnings: list[str] = field(default_factory=list)
     turns: list[Turn] = field(default_factory=list)
+    srt_path: Path | None = None
 
     @property
     def summary(self) -> str:
@@ -183,6 +185,21 @@ class Pipeline:
             markdown, out_dir / f"{safe_filename(title)}.md"
         )
 
+        # 4b) SRT 字幕：与 Markdown 同名。角色前缀 auto——多人对话才标「角色A：」，
+        #     单人视频满屏前缀只会干扰阅读。
+        srt_path: Path | None = None
+        if self.cfg.export_srt:
+            if progress:
+                progress(0.97, "生成 SRT 字幕…")
+            if self.cfg.srt_prefix == "auto":
+                use_prefix = speaker_prefix_needed(turns)
+            else:
+                use_prefix = self.cfg.srt_prefix == "always"
+            srt_path = write_srt(
+                render_srt(turns, speaker_prefix=use_prefix),
+                out_dir / f"{safe_filename(title)}.srt",
+            )
+
         # 5) 清理：尽力而为。删除失败绝不能影响已经完成的转写结果，
         #    某些环境会用安全钩子拦截程序化删除。
         if not self.cfg.keep_audio:
@@ -203,6 +220,7 @@ class Pipeline:
             elapsed_s=time.time() - started,
             warnings=warnings,
             turns=turns,
+            srt_path=srt_path,
         )
 
     # ---------- 缓存读写 ----------

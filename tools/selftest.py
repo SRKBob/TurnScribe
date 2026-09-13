@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import LOG_DIR, SCRATCH_DIR, RenderConfig  # noqa: E402
 from core.render import fmt_ts, merge_segments, render_markdown, safe_filename  # noqa: E402
-from core.types import MediaMeta, Segment, speaker_label  # noqa: E402
+from core.types import MediaMeta, Segment, Turn, speaker_label  # noqa: E402
 
 lines: list[str] = []
 failures: list[str] = []
@@ -168,6 +168,42 @@ out_dir = LOG_DIR
 out_dir.mkdir(parents=True, exist_ok=True)
 (out_dir / "_selftest.md").write_text(md, encoding="utf-8")
 log(f"\n样例 Markdown：{out_dir / '_selftest.md'}")
+
+# --- SRT 字幕渲染 ---
+from core.srt import build_cues, fmt_srt_ts, render_srt, speaker_prefix_needed, write_srt  # noqa: E402
+
+check("SRT 毫秒时间戳", fmt_srt_ts(3_725_123), "01:02:05,123")
+check("SRT 零点时间戳", fmt_srt_ts(0), "00:00:00,000")
+
+srt_turns = [
+    Turn(speaker=0, start_ms=0, end_ms=5_000, text="大家好，今天讲三件事。"),
+    Turn(speaker=1, start_ms=20_000, end_ms=23_000, text="第一件事是什么？"),
+]
+srt_multi = render_srt(srt_turns, speaker_prefix=True)
+check("SRT 序号从 1 开始", srt_multi.startswith("1\n"), True)
+check("SRT 时间轴格式", "00:00:00,000 --> 00:00:05,000" in srt_multi, True)
+check("SRT 多人带角色前缀", "角色A：大家好" in srt_multi and "角色B：第一件事是什么？" in srt_multi, True)
+check("SRT 结尾换行收束", srt_multi.endswith("\n"), True)
+
+# auto 策略：单人视频不加前缀，多人视频加
+check("auto 前缀-多人加", speaker_prefix_needed(srt_turns), True)
+check("auto 前缀-单人不加", speaker_prefix_needed(srt_turns[:1]), False)
+srt_single = render_srt(srt_turns[:1], speaker_prefix=speaker_prefix_needed(srt_turns[:1]))
+check("单人字幕无前缀", "角色A：" not in srt_single and "大家好" in srt_single, True)
+
+# 长句切分：每条字幕的结束时间应顶到下一条开始（或段尾），且不早于开始时间
+long_turn = Turn(speaker=0, start_ms=10_000, end_ms=30_000,
+                 text="第一句话。" * 12)  # 72 字，必然切多条
+cues = build_cues([long_turn], speaker_prefix=False)
+check("长句切成多条字幕", len(cues) > 1, True)
+check("字幕时间单调递增",
+      all(cues[i].start_ms < cues[i + 1].start_ms for i in range(len(cues) - 1)), True)
+check("末条字幕结束于段尾", cues[-1].end_ms, 30_000)
+check("字幕时长不低于下限", all(c.end_ms - c.start_ms >= 600 for c in cues), True)
+
+srt_text = render_srt([long_turn], speaker_prefix=False)
+(out_dir / "_selftest.srt").write_text(srt_text, encoding="utf-8-sig", newline="\r\n")
+log(f"样例 SRT：{out_dir / '_selftest.srt'}")
 
 summary = "自检通过" if not failures else f"自检未通过（{len(failures)} 项失败）"
 log(summary)

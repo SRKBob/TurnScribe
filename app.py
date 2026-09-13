@@ -147,6 +147,7 @@ def run_task(
     resume: bool,
     keep_audio: bool,
     threshold: float,
+    export_srt: bool,
 ):
     """生成器：边处理边把进度推给界面。"""
     sources, notes = build_inputs(files, links)
@@ -166,6 +167,7 @@ def run_task(
         ),
         resume=resume,
         keep_audio=keep_audio,
+        export_srt=export_srt,
     )
     global _PIPELINE
     if _PIPELINE is None or _PIPELINE.cfg != cfg:
@@ -210,8 +212,13 @@ def run_task(
         try:
             result = pipeline.process(source, out_dir=target_dir, progress=progress)
             outputs.append(str(result.md_path))
+            if result.srt_path:
+                outputs.append(str(result.srt_path))
             preview = result.md_path.read_text(encoding="utf-8")
-            log.append(f"  完成 → {result.md_path.name}（{result.summary}）")
+            produced = result.md_path.name
+            if result.srt_path:
+                produced += f" + {result.srt_path.name}"
+            log.append(f"  完成 → {produced}（{result.summary}）")
             for warning in result.warnings:
                 log.append(f"  注意：{warning}")
         except Exception as exc:  # 单个任务失败不应中断整批
@@ -304,6 +311,10 @@ def build_ui() -> gr.Blocks:
                         choices=[("角色A：内容", "inline"), ("角色名独立成行", "block")],
                         value="inline",
                     )
+                    export_srt = gr.Checkbox(
+                        label="同时导出 SRT 字幕（多人视频自动带角色前缀）",
+                        value=True,
+                    )
 
         with gr.Accordion("高级参数", open=False):
             with gr.Row():
@@ -336,7 +347,7 @@ def build_ui() -> gr.Blocks:
                     value="_转写完成后，文稿会显示在这里。_",
                     elem_classes=["ts-preview"],
                 )
-        download = gr.Files(label="下载 Markdown", height=88, elem_classes=["ts-download"])
+        download = gr.Files(label="下载转写稿 / 字幕", height=88, elem_classes=["ts-download"])
 
         with gr.Accordion("环境详情", open=False):
             gr.Markdown(env_report())
@@ -354,6 +365,7 @@ def build_ui() -> gr.Blocks:
             inputs=[
                 files, links, out_dir, device, language, style,
                 with_timestamp, speaker_stats, resume, keep_audio, threshold,
+                export_srt,
             ],
             outputs=[status, log_box, download, preview],
         )

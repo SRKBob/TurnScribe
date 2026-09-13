@@ -44,6 +44,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="说话人聚类阈值，越小越倾向合并为同一人")
     p.add_argument("--no-resume", action="store_true", help="忽略缓存，强制重新识别")
     p.add_argument("--keep-audio", action="store_true", help="保留抽取的音轨")
+    p.add_argument("--no-srt", action="store_true", help="不导出 SRT 字幕（默认同时导出）")
+    p.add_argument("--srt-no-prefix", action="store_true",
+                   help="SRT 字幕不加角色前缀（默认多人视频自动加）")
     return p
 
 
@@ -69,6 +72,8 @@ def main() -> int:
         ),
         resume=not args.no_resume,
         keep_audio=args.keep_audio,
+        export_srt=not args.no_srt,
+        srt_prefix="never" if args.srt_no_prefix else "auto",
     )
 
     pipeline = Pipeline(cfg)  # 模型只加载一次，批量复用
@@ -89,6 +94,8 @@ def main() -> int:
             result = pipeline.process(source, out_dir=out_dir, progress=progress)
             done.append(result.md_path)
             print(f"    -> {result.md_path}")
+            if result.srt_path:
+                print(f"    -> {result.srt_path}")
             print(f"       {result.summary}")
             for warning in result.warnings:
                 print(f"       注意：{warning}")
