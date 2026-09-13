@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import glob
+import os
 import re
 import shutil
 from abc import ABC, abstractmethod
@@ -98,6 +99,11 @@ class YtDlpResolver(Resolver):
                 "writeinfojson": True,   # 供 pipeline 取原始标题，用于 Markdown 文件名
                 "progress_hooks": [hook],
             }
+            # YouTube 等被墙平台：设置环境变量 YTDLP_PROXY 后走代理
+            # （例：set YTDLP_PROXY=http://127.0.0.1:7890 —— 与 Clash/v2rayN 的本地端口一致）
+            proxy = os.environ.get("YTDLP_PROXY", "").strip()
+            if proxy:
+                opts["proxy"] = proxy
             if use_cookies:
                 # 抖音等平台需要登录态，从本机 Edge 读取 Cookie。
                 # Cookie 仅在本机内存中交给 yt-dlp，不落盘、不进版本库。

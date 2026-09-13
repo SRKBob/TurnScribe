@@ -49,7 +49,7 @@ PLATFORM_NOTE = {
     "kuaishou": "快手可能需要浏览器登录态",
     "xiaohongshu": "小红书可能需要浏览器登录态",
     "wechat_channels": "视频号可能需要浏览器登录态",
-    "youtube": "YouTube 通常可直接解析",
+    "youtube": "YouTube 国内网络需代理：设置环境变量 YTDLP_PROXY=http://127.0.0.1:代理端口 后重启",
 }
 
 _PIPELINE: Pipeline | None = None
