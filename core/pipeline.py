@@ -188,7 +188,7 @@ class Pipeline:
         md_path: Path | None = None
         if self.cfg.export_md:
             md_path = write_markdown(
-                markdown, out_dir / f"{safe_filename(title)}.md"
+                markdown, out_dir / "文稿" / f"{safe_filename(title)}.md"
             )
 
         # 4b) SRT 字幕：与 Markdown 同名。角色前缀 auto——多人对话才标「角色A：」，
@@ -203,7 +203,7 @@ class Pipeline:
                 use_prefix = self.cfg.srt_prefix == "always"
             srt_path = write_srt(
                 render_srt(turns, speaker_prefix=use_prefix),
-                out_dir / f"{safe_filename(title)}.srt",
+                out_dir / "srt" / f"{safe_filename(title)}.srt",
             )
 
         # 5) 清理：尽力而为。删除失败绝不能影响已经完成的转写结果，
