@@ -48,3 +48,6 @@ __pycache__/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# 面试准备（个人材料，不入库）
+面试准备.md
