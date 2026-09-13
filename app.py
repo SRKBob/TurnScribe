@@ -147,12 +147,20 @@ def run_task(
     resume: bool,
     keep_audio: bool,
     threshold: float,
+    export_md: bool,
     export_srt: bool,
 ):
     """生成器：边处理边把进度推给界面。"""
     sources, notes = build_inputs(files, links)
     if not sources:
         yield "### 请先上传视频文件或填入视频链接\n", "", [], ""
+        return
+
+    if not (export_md or export_srt):
+        yield (
+            "### 请至少选择一种导出格式\n\n"
+            "「导出 Markdown 文稿」和「导出 SRT 字幕」至少勾选一个。\n"
+        ), "", [], ""
         return
 
     cfg = replace(
@@ -167,6 +175,7 @@ def run_task(
         ),
         resume=resume,
         keep_audio=keep_audio,
+        export_md=export_md,
         export_srt=export_srt,
     )
     global _PIPELINE
@@ -211,13 +220,18 @@ def run_task(
 
         try:
             result = pipeline.process(source, out_dir=target_dir, progress=progress)
-            outputs.append(str(result.md_path))
+            if result.md_path:
+                outputs.append(str(result.md_path))
             if result.srt_path:
                 outputs.append(str(result.srt_path))
-            preview = result.md_path.read_text(encoding="utf-8")
-            produced = result.md_path.name
-            if result.srt_path:
-                produced += f" + {result.srt_path.name}"
+            preview = (
+                result.md_path.read_text(encoding="utf-8")
+                if result.md_path
+                else (result.srt_path.read_text(encoding="utf-8-sig") if result.srt_path else "")
+            )
+            produced = " + ".join(
+                p.name for p in (result.md_path, result.srt_path) if p
+            )
             log.append(f"  完成 → {produced}（{result.summary}）")
             for warning in result.warnings:
                 log.append(f"  注意：{warning}")
@@ -311,8 +325,9 @@ def build_ui() -> gr.Blocks:
                         choices=[("角色A：内容", "inline"), ("角色名独立成行", "block")],
                         value="inline",
                     )
+                    export_md = gr.Checkbox(label="导出 Markdown 文稿", value=True)
                     export_srt = gr.Checkbox(
-                        label="同时导出 SRT 字幕（多人视频自动带角色前缀）",
+                        label="导出 SRT 字幕（多人视频自动带角色前缀）",
                         value=True,
                     )
 
@@ -365,7 +380,7 @@ def build_ui() -> gr.Blocks:
             inputs=[
                 files, links, out_dir, device, language, style,
                 with_timestamp, speaker_stats, resume, keep_audio, threshold,
-                export_srt,
+                export_md, export_srt,
             ],
             outputs=[status, log_box, download, preview],
         )

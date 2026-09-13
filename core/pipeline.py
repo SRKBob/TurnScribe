@@ -36,7 +36,7 @@ CACHE_VERSION = 4
 class TaskResult:
     source: str
     title: str
-    md_path: Path
+    md_path: Path | None
     duration_ms: int
     speaker_count: int
     turn_count: int
@@ -164,9 +164,13 @@ class Pipeline:
                 progress(0.92, "命中缓存，复用上一轮识别结果")
             speaker_count = len({s.speaker for s in segments if s.speaker >= 0}) or 1
 
-        # 4) 合并 + 渲染
+        # 4) 合并 + 渲染。文稿与字幕独立开关，但至少要选一个——
+        #    什么都不导出的转写没有意义，直接当成配置错误拦下。
+        if not (self.cfg.export_md or self.cfg.export_srt):
+            raise ValueError("导出格式一项都没勾选：请至少选择「Markdown 文稿」或「SRT 字幕」其中之一")
+
         if progress:
-            progress(0.94, "合并段落并渲染 Markdown…")
+            progress(0.94, "合并段落并渲染…")
         turns = merge_segments(
             segments,
             merge_gap_ms=self.cfg.diarize.merge_gap_ms,
@@ -181,9 +185,11 @@ class Pipeline:
         )
         markdown = render_markdown(meta, turns, self.cfg.render)
 
-        md_path = write_markdown(
-            markdown, out_dir / f"{safe_filename(title)}.md"
-        )
+        md_path: Path | None = None
+        if self.cfg.export_md:
+            md_path = write_markdown(
+                markdown, out_dir / f"{safe_filename(title)}.md"
+            )
 
         # 4b) SRT 字幕：与 Markdown 同名。角色前缀 auto——多人对话才标「角色A：」，
         #     单人视频满屏前缀只会干扰阅读。

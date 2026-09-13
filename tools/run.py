@@ -44,6 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="说话人聚类阈值，越小越倾向合并为同一人")
     p.add_argument("--no-resume", action="store_true", help="忽略缓存，强制重新识别")
     p.add_argument("--keep-audio", action="store_true", help="保留抽取的音轨")
+    p.add_argument("--no-md", action="store_true", help="不导出 Markdown 文稿（只出 SRT 时用）")
     p.add_argument("--no-srt", action="store_true", help="不导出 SRT 字幕（默认同时导出）")
     p.add_argument("--srt-no-prefix", action="store_true",
                    help="SRT 字幕不加角色前缀（默认多人视频自动加）")
@@ -72,6 +73,7 @@ def main() -> int:
         ),
         resume=not args.no_resume,
         keep_audio=args.keep_audio,
+        export_md=not args.no_md,
         export_srt=not args.no_srt,
         srt_prefix="never" if args.srt_no_prefix else "auto",
     )
@@ -82,6 +84,7 @@ def main() -> int:
 
     done: list[Path] = []
     failed: list[tuple[str, str]] = []
+    ok_count = 0
 
     for index, source in enumerate(args.sources, start=1):
         shown = Path(source).name if not source.lower().startswith("http") else source
@@ -92,8 +95,10 @@ def main() -> int:
 
         try:
             result = pipeline.process(source, out_dir=out_dir, progress=progress)
-            done.append(result.md_path)
-            print(f"    -> {result.md_path}")
+            ok_count += 1
+            if result.md_path:
+                done.append(result.md_path)
+                print(f"    -> {result.md_path}")
             if result.srt_path:
                 print(f"    -> {result.srt_path}")
             print(f"       {result.summary}")
@@ -104,7 +109,7 @@ def main() -> int:
             print(f"    !! 失败：{exc}")
         print()
 
-    print(f"完成 {len(done)} 个，失败 {len(failed)} 个")
+    print(f"完成 {ok_count} 个，失败 {len(failed)} 个")
     for path in done:
         print(f"  OK  {path}")
     for source, err in failed:

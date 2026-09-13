@@ -130,7 +130,8 @@ class AppConfig:
     render: RenderConfig = field(default_factory=RenderConfig)
     keep_audio: bool = False             # 处理完是否保留抽取的音频
     resume: bool = True                  # 断点续传：已完成的片段不重跑
-    export_srt: bool = True              # 同时导出 SRT 字幕（与 Markdown 同名）
+    export_md: bool = True               # 导出 Markdown 文稿
+    export_srt: bool = True              # 导出 SRT 字幕（与文稿同名）；二者至少选一
     srt_prefix: str = "auto"             # 字幕角色前缀：auto=多人时加 | always | never
 
 
