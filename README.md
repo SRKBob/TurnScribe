@@ -125,6 +125,12 @@
 
 双击 **`run.bat`**，浏览器会自动打开 `http://127.0.0.1:7860`。
 
+也可以执行一次 `tools\make_shortcut.py` 生成带项目图标的桌面快捷方式，之后像开普通软件一样双击「话轮 TurnScribe」即可：
+
+```bat
+.venv\Scripts\python.exe tools\make_shortcut.py
+```
+
 服务只监听本机回环地址。**不要改成 `0.0.0.0` 或开启 Gradio 的 `share=True`** —— 那会把界面暴露到局域网或公网。
 
 关闭方式：关掉那个黑色命令行窗口（不是关浏览器标签页）。

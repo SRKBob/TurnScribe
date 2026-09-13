@@ -1,5 +1,6 @@
 @echo off
 chcp 65001 >nul
+title 话轮 TurnScribe
 cd /d "%~dp0"
 set PYTHONIOENCODING=utf-8
 rem 把 Python 字节码缓存也收进 temp，避免项目目录里散落 __pycache__

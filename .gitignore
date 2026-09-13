@@ -21,6 +21,10 @@ output/
 # ===== 发行包（tools/make_dist.py 产物）=====
 dist/
 
+# ===== 本机快捷方式与 AI 生图缓存 =====
+*.lnk
+generated-images/
+
 # ===== WorkBuddy 工作记录（个人笔记）=====
 .workbuddy/
 
