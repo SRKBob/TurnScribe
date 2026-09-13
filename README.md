@@ -1,6 +1,12 @@
+<div align="center">
+
+<img src="assets/icon.png" width="96" alt="话轮 TurnScribe 图标" />
+
 # 话轮 TurnScribe
 
-> 把视频转成「谁在说」的文稿。
+**把视频转成「谁在说」的文稿。**
+
+</div>
 
 把视频（或音频、或视频链接）转成**带说话人区分的 Markdown 转写稿**。
 
