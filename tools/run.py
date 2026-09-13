@@ -48,6 +48,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-srt", action="store_true", help="不导出 SRT 字幕（默认同时导出）")
     p.add_argument("--srt-no-prefix", action="store_true",
                    help="SRT 字幕不加角色前缀（默认多人视频自动加）")
+    p.add_argument("--no-cc", action="store_true",
+                   help="B站链接不直读自带 CC 字幕，强制走语音识别")
     return p
 
 
@@ -76,6 +78,7 @@ def main() -> int:
         export_md=not args.no_md,
         export_srt=not args.no_srt,
         srt_prefix="never" if args.srt_no_prefix else "auto",
+        prefer_cc=not args.no_cc,
     )
 
     pipeline = Pipeline(cfg)  # 模型只加载一次，批量复用

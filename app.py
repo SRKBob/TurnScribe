@@ -149,6 +149,7 @@ def run_task(
     threshold: float,
     export_md: bool,
     export_srt: bool,
+    prefer_cc: bool,
 ):
     """生成器：边处理边把进度推给界面。"""
     sources, notes = build_inputs(files, links)
@@ -177,6 +178,7 @@ def run_task(
         keep_audio=keep_audio,
         export_md=export_md,
         export_srt=export_srt,
+        prefer_cc=prefer_cc,
     )
     global _PIPELINE
     if _PIPELINE is None or _PIPELINE.cfg != cfg:
@@ -344,6 +346,10 @@ def build_ui() -> gr.Blocks:
                     speaker_stats = gr.Checkbox(label="附各角色发言时长统计", value=False)
                     resume = gr.Checkbox(label="断点续传（复用已有识别结果）", value=True)
                     keep_audio = gr.Checkbox(label="保留抽取的音频文件", value=False)
+                    prefer_cc = gr.Checkbox(
+                        label="B站链接优先直读自带 CC 字幕（命中则跳过下载与识别，秒级出稿）",
+                        value=True,
+                    )
 
         run_btn = gr.Button("开始转写", variant="primary", size="lg", elem_classes=["ts-run"])
 
@@ -382,7 +388,7 @@ def build_ui() -> gr.Blocks:
             inputs=[
                 files, links, out_dir, device, language, style,
                 with_timestamp, speaker_stats, resume, keep_audio, threshold,
-                export_md, export_srt,
+                export_md, export_srt, prefer_cc,
             ],
             outputs=[status, log_box, download, preview],
         )

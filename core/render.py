@@ -117,6 +117,8 @@ def render_markdown(
         lines.append(f"> 来源：{meta.source or '本地文件'}")
         lines.append(f"> 时长：{fmt_ts(meta.duration_ms)}")
         lines.append(f"> 说话人：{len(speakers)} 位")
+        if meta.extra.get("transcript_source") == "cc":
+            lines.append("> 说明：本稿直接取自视频自带 CC 字幕，字幕不含说话人信息，全文统一显示为「角色A」。")
         lines.append(f"> 转写时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
         lines.append("")
         lines.append("> 由 SenseVoice 自动转写，可能存在识别误差，重要内容请对照原视频核对。")

@@ -205,6 +205,31 @@ srt_text = render_srt([long_turn], speaker_prefix=False)
 (out_dir / "_selftest.srt").write_text(srt_text, encoding="utf-8-sig", newline="\r\n")
 log(f"样例 SRT：{out_dir / '_selftest.srt'}")
 
+# --- B站 CC 字幕直读（纯解析，不联网）---
+from core.ccsubs import _pick_subtitle_track, _video_id, parse_body_entries  # noqa: E402
+
+check("BV 号提取", _video_id("https://www.bilibili.com/video/BV191GR6VE1i/?p=1"), "BV191GR6VE1i")
+check("b23 短链外中转不误判", _video_id("https://www.bilibili.com/video/av170001/"), "av170001")
+
+tracks = [
+    {"lan": "en", "lan_doc": "英语"},
+    {"lan": "ai-zh", "lan_doc": "AI 中文"},
+    {"lan": "zh-Hans", "lan_doc": "简中"},
+]
+check("字幕轨优先 AI 中文", _pick_subtitle_track(tracks)["lan"], "ai-zh")
+check("无中文轨时取第一轨", _pick_subtitle_track([tracks[0]])["lan"], "en")
+check("空轨列表返回 None", _pick_subtitle_track([]), None)
+
+segments_cc = parse_body_entries([
+    {"from": 0.4, "to": 2.8, "content": "大家好"},
+    {"from": 3.0, "to": 5.0, "content": "  "},
+    {"from": 5.2, "to": 9.6, "content": "今天讲三件事。"},
+])
+check("CC 条目转 Segment", len(segments_cc), 2)
+check("CC 时间换算毫秒", (segments_cc[0].start_ms, segments_cc[0].end_ms), (400, 2800))
+check("CC 空文本剔除", all(s.text.strip() for s in segments_cc), True)
+check("CC 说话人统一为 0", {s.speaker for s in segments_cc}, {0})
+
 summary = "自检通过" if not failures else f"自检未通过（{len(failures)} 项失败）"
 log(summary)
 lines.append(f"exit={1 if failures else 0}")

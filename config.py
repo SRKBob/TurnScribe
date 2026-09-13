@@ -26,20 +26,35 @@ def _load_local_ffmpeg_candidates() -> tuple[str, ...]:
 
     按文件路径直接加载，不依赖 sys.path，避免从别处导入 config 时静默失效。
     """
+    module = _load_local_module()
+    if module is None:
+        return ()
+    return tuple(str(p) for p in getattr(module, "FFMPEG_CANDIDATES", ()))
+
+
+def _load_local_module() -> object | None:
     path = ROOT / "local_config.py"
     if not path.is_file():
-        return ()
+        return None
     try:
         import importlib.util
 
         spec = importlib.util.spec_from_file_location("_local_config", path)
         if spec is None or spec.loader is None:
-            return ()
+            return None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        return tuple(str(p) for p in getattr(module, "FFMPEG_CANDIDATES", ()))
+        return module
     except Exception:  # 本机配置写错不应该阻断主流程
-        return ()
+        return None
+
+
+def _local_attr(name: str, default: str = "") -> str:
+    """从 local_config.py 读单个字符串配置，缺省返回 default。"""
+    module = _load_local_module()
+    if module is None:
+        return default
+    return str(getattr(module, name, default) or default)
 
 
 # ffmpeg 搜索顺序：环境变量 FFMPEG_BIN > PATH > 项目 bin/ > 常见安装位置 > 本机私有配置。
@@ -133,6 +148,11 @@ class AppConfig:
     export_md: bool = True               # 导出 Markdown 文稿
     export_srt: bool = True              # 导出 SRT 字幕（与文稿同名）；二者至少选一
     srt_prefix: str = "auto"             # 字幕角色前缀：auto=多人时加 | always | never
+    prefer_cc: bool = True               # B站链接优先直读自带 CC 字幕（命中则跳过下载与识别）
 
 
 CONFIG = AppConfig()
+
+# B站登录态：AI 字幕（ai-zh）必须登录才能拉到，UP 主手传 CC 匿名可见。
+# 从环境变量或 local_config.py 的 BILIBILI_SESSDATA 读取（后者已 gitignore）。
+BILIBILI_SESSDATA = os.environ.get("BILIBILI_SESSDATA", "").strip() or _local_attr("BILIBILI_SESSDATA")

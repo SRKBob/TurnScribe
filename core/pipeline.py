@@ -16,10 +16,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from config import CONFIG, CACHE_DIR, AppConfig, ensure_dirs
+from config import BILIBILI_SESSDATA, CONFIG, CACHE_DIR, AppConfig, ensure_dirs
 from core.asr import ASREngine
+from core.ccsubs import fetch_cc_subtitles
 from core.diarize import DiarizationError, Diarizer, assign_single_speaker
-from core.downloader import cleanup_downloads, resolve_input
+from core.downloader import cleanup_downloads, detect_platform, is_url, resolve_input
 from core.media import extract_audio, probe_duration_ms
 from core.render import merge_segments, render_markdown, safe_filename, write_markdown
 from core.srt import render_srt, speaker_prefix_needed, write_srt
@@ -54,8 +55,11 @@ class TaskResult:
         )
 
 
-def _cache_key(source: str, path: Path, cfg: AppConfig) -> str:
-    """缓存键：来源 + 文件大小/修改时间 + 影响结果的配置项。"""
+def _cache_key(source: str, path: Path, cfg: AppConfig, *, cc_mode: bool = False) -> str:
+    """缓存键：来源 + 文件大小/修改时间 + 影响结果的配置项。
+
+    CC 直读与 ASR 是两条不同的识别路径，结果不能混用同一个缓存格。
+    """
     stat = path.stat() if path.is_file() else None
     raw = json.dumps(
         {
@@ -67,6 +71,7 @@ def _cache_key(source: str, path: Path, cfg: AppConfig) -> str:
             "itn": cfg.asr.use_itn,
             "device": cfg.asr.device,
             "threshold": cfg.diarize.cluster_threshold,
+            "cc": cc_mode,
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -115,54 +120,100 @@ class Pipeline:
         out_dir = out_dir or (Path(__file__).resolve().parent.parent / "output")
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        # 1) 解析输入（本地路径直通，链接走下载器）
-        media_path, platform = resolve_input(
-            raw_input, CACHE_DIR / "downloads", self._scaled(progress, 0.0, 0.05)
-        )
-        duration_ms = probe_duration_ms(media_path)
-
-        key = _cache_key(raw_input, media_path, self.cfg)
-        work = CACHE_DIR / key
-        work.mkdir(parents=True, exist_ok=True)
-        audio_path = work / "audio.wav"
-        seg_file = work / "02_segments_spk.json"
-
-        # 2) 抽音轨（缓存命中则跳过）
-        if not audio_path.exists():
-            if progress:
-                progress(0.05, "抽取音轨（仅取音频，忽略视频流）…")
-            extract_audio(media_path, audio_path)
-        else:
-            if progress:
-                progress(0.05, "复用已抽取的音轨")
-
-        # 3) 识别 + 说话人分离（整体结果一起缓存）
-        segments = self._load_segments(seg_file) if self.cfg.resume else None
-        if segments is None:
-            segments = self._get_asr().transcribe(
-                audio_path,
-                progress=self._scaled(progress, 0.10, 0.65),
-                duration_ms=duration_ms,
-            )
-            if not segments:
-                raise ValueError("未识别到任何语音内容，请检查视频音轨")
-
-            speaker_count = 0
-            if progress:
-                progress(0.65, "说话人分离中…")
+        # 1) B站 CC 字幕直读（快路径）：命中则跳过下载、抽音轨、ASR、说话人分离，
+        #    3 小时的视频从「几十 MB 下载 + 小时级识别」变成秒级。
+        #    没拿到字幕轨（未开启 AI 字幕 / 无登录态 / 非 B站）则静默走原路径。
+        cc_segments: list[Segment] | None = None
+        cc_title = ""
+        cc_duration_s = 0.0
+        cc_lang = ""
+        if (
+            self.cfg.prefer_cc
+            and is_url(raw_input)
+            and detect_platform(raw_input) == "bilibili"
+        ):
             try:
-                speaker_count = self._get_diarizer().assign(
-                    audio_path, segments, self._scaled(progress, 0.65, 0.92)
+                if progress:
+                    progress(0.05, "探测 B站 CC 字幕…")
+                cc = fetch_cc_subtitles(
+                    raw_input,
+                    sessdata=BILIBILI_SESSDATA,
+                    progress=self._scaled(progress, 0.05, 0.90),
                 )
-            except DiarizationError as exc:
-                warnings.append(f"说话人分离失败，已降级为单说话人：{exc}")
-                speaker_count = assign_single_speaker(segments)
+            except Exception as exc:  # CC 探测失败绝不能挡住 ASR 主路径
+                cc = None
+                warnings.append(f"CC 字幕探测失败，转入语音识别：{exc}")
+            if cc is not None:
+                cc_segments = cc["segments"]
+                cc_title = cc["title"]
+                cc_duration_s = float(cc["duration_s"])
+                cc_lang = cc["lang"]
 
-            self._save_segments(seg_file, segments)
-        else:
+        if cc_segments is not None:
+            key = _cache_key(raw_input, Path(cc_title or "cc"), self.cfg, cc_mode=True)
+            work = CACHE_DIR / key
+            work.mkdir(parents=True, exist_ok=True)
+            self._save_segments(work / "02_segments_spk.json", cc_segments)
+            segments = cc_segments
+            duration_ms = int(cc_duration_s * 1000)
+            platform = "bilibili"
+            speaker_count = 1
+            transcript_source = "cc"
+            warnings.append(
+                f"本稿取自 B站 CC 字幕（{cc_lang}）：字幕无说话人信息，全文统一显示为「角色A」。"
+            )
             if progress:
-                progress(0.92, "命中缓存，复用上一轮识别结果")
-            speaker_count = len({s.speaker for s in segments if s.speaker >= 0}) or 1
+                progress(0.92, "CC 字幕命中，跳过下载与识别")
+        else:
+            # 1') 常规路径：本地路径直通，链接走下载器
+            transcript_source = "asr"
+            media_path, platform = resolve_input(
+                raw_input, CACHE_DIR / "downloads", self._scaled(progress, 0.0, 0.05)
+            )
+            duration_ms = probe_duration_ms(media_path)
+
+            key = _cache_key(raw_input, media_path, self.cfg)
+            work = CACHE_DIR / key
+            work.mkdir(parents=True, exist_ok=True)
+            audio_path = work / "audio.wav"
+            seg_file = work / "02_segments_spk.json"
+
+            # 2) 抽音轨（缓存命中则跳过）
+            if not audio_path.exists():
+                if progress:
+                    progress(0.05, "抽取音轨（仅取音频，忽略视频流）…")
+                extract_audio(media_path, audio_path)
+            else:
+                if progress:
+                    progress(0.05, "复用已抽取的音轨")
+
+            # 3) 识别 + 说话人分离（整体结果一起缓存）
+            segments = self._load_segments(seg_file) if self.cfg.resume else None
+            if segments is None:
+                segments = self._get_asr().transcribe(
+                    audio_path,
+                    progress=self._scaled(progress, 0.10, 0.65),
+                    duration_ms=duration_ms,
+                )
+                if not segments:
+                    raise ValueError("未识别到任何语音内容，请检查视频音轨")
+
+                speaker_count = 0
+                if progress:
+                    progress(0.65, "说话人分离中…")
+                try:
+                    speaker_count = self._get_diarizer().assign(
+                        audio_path, segments, self._scaled(progress, 0.65, 0.92)
+                    )
+                except DiarizationError as exc:
+                    warnings.append(f"说话人分离失败，已降级为单说话人：{exc}")
+                    speaker_count = assign_single_speaker(segments)
+
+                self._save_segments(seg_file, segments)
+            else:
+                if progress:
+                    progress(0.92, "命中缓存，复用上一轮识别结果")
+                speaker_count = len({s.speaker for s in segments if s.speaker >= 0}) or 1
 
         # 4) 合并 + 渲染。文稿与字幕独立开关，但至少要选一个——
         #    什么都不导出的转写没有意义，直接当成配置错误拦下。
@@ -176,12 +227,17 @@ class Pipeline:
             merge_gap_ms=self.cfg.diarize.merge_gap_ms,
             min_turn_ms=self.cfg.diarize.min_turn_ms,
         )
-        title = media_path.stem if platform == "local" else _title_from_download(media_path)
+        title = (
+            cc_title
+            if transcript_source == "cc"
+            else (media_path.stem if platform == "local" else _title_from_download(media_path))
+        )
         meta = MediaMeta(
             title=title,
             source=raw_input,
             duration_ms=duration_ms,
             platform=platform,
+            extra={"transcript_source": transcript_source},
         )
         markdown = render_markdown(meta, turns, self.cfg.render)
 
