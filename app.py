@@ -15,6 +15,20 @@ import sys
 from dataclasses import replace
 from pathlib import Path
 
+# 本机若挂代理（HTTP_PROXY/HTTPS_PROXY，如 Clash 的 7890），Gradio 启动自检
+# httpx.get("http://127.0.0.1:7860/gradio_api/startup-events") 会被代理劫持，
+# 代理返回 400 导致启动直接失败。对本机地址一律声明直连（NO_PROXY）。
+# 注意要在 import gradio 之前改环境变量。
+_no_proxy = {
+    host.strip()
+    for host in (os.environ.get("NO_PROXY") or os.environ.get("no_proxy") or "").split(",")
+    if host.strip()
+}
+_no_proxy.update(("127.0.0.1", "localhost", "::1"))
+_joined = ",".join(sorted(_no_proxy))
+os.environ["NO_PROXY"] = _joined
+os.environ["no_proxy"] = _joined
+
 import gradio as gr
 
 ROOT = Path(__file__).resolve().parent
