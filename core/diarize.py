@@ -47,6 +47,7 @@ class Diarizer:
             model="cam++",
             device=self.device,
             disable_update=True,
+            disable_pbar=True,  # 逐段调用 generate 时每段会新建一条 tqdm 蓝条，在控制台堆成刷屏
         )
 
     # ---------- 声纹提取 ----------
